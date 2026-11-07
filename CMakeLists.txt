@@ -35,4 +35,11 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/src/main.cpp")
     add_executable(BarcodeDesktopApp WIN32 src/main.cpp ${GUI_SOURCES})
     target_include_directories(BarcodeDesktopApp PRIVATE "${CMAKE_SOURCE_DIR}/src/gui")
     target_link_libraries(BarcodeDesktopApp PRIVATE services Qt6::Widgets)
+    # Copy Qt plugins (platforms\qwindows.dll etc.) next to the exe after every build
+    add_custom_command(TARGET BarcodeDesktopApp POST_BUILD
+        COMMAND "${VCPKG_INSTALLED_DIR}/x64-windows/tools/Qt6/bin/windeployqt.exe"
+                $<IF:$<CONFIG:Debug>,--debug,--release>
+                --no-translations --no-compiler-runtime
+                "$<TARGET_FILE:BarcodeDesktopApp>"
+        COMMENT "Deploying Qt plugins")
 endif()
