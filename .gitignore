@@ -5,4 +5,4 @@ vcpkg_installed/
 .vscode/
 CMakeUserPresets.json
 *.user
-output/generated_barcodes/
+output/generated_barcodes/last_frame.png
