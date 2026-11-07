@@ -3,8 +3,15 @@
   "version": "0.1.0",
   "dependencies": [
     "qtbase",
-    "opencv4",
-    "zint",
-    "zxing-cpp"
+    {
+      "name": "opencv4",
+      "default-features": false,
+      "features": ["jpeg", "png", "dshow", "msmf"]
+    },
+    {
+      "name": "zint",
+      "features": ["png"]
+    },
+    "nu-book-zxing-cpp"
   ]
 }
