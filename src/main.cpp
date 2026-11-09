@@ -1,11 +1,19 @@
 #include <QApplication>
-#include <QLabel>
+#include "MainWindow.h"
+#include "Theme.h"
 
 int main(int argc, char* argv[])
 {
     QApplication app(argc, argv);
-    QLabel label("Qt works!");
-    label.resize(300, 100);
-    label.show();
+    app.setApplicationName("Barcode Reader & Scanner");
+    app.setApplicationVersion("1.0.0");
+    app.setOrganizationName("ISE Team");
+
+    // Apply unified modern application theme
+    app.setStyleSheet(Theme::getApplicationStyle());
+
+    MainWindow window;
+    window.show();
+
     return app.exec();
 }
