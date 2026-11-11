@@ -51,7 +51,7 @@ OperationResult decodeBarcodeMat(const cv::Mat& image)
                               static_cast<int>(gray.step));
 
         ZXing::ReaderOptions options;
-        options.setFormats(ZXing::BarcodeFormat::Code128);
+        options.setFormats(ZXing::BarcodeFormat::Code39);
         options.setTryHarder(true);
 
         ZXing::Barcode barcode = ZXing::ReadBarcode(view, options);
