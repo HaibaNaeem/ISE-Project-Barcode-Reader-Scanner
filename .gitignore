@@ -6,3 +6,4 @@ vcpkg_installed/
 CMakeUserPresets.json
 *.user
 output/generated_barcodes/last_frame.png
+vcpkg-cache/
