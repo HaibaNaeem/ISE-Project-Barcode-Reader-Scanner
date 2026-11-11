@@ -6,3 +6,7 @@ vcpkg_installed/
 CMakeUserPresets.json
 *.user
 output/generated_barcodes/last_frame.png
+# Test output files
+blank_test.png
+corrupt_test.png
+jpg_test.jpg
