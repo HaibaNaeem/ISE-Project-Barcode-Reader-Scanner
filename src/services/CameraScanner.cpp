@@ -1,8 +1,8 @@
 #include "CameraScanner.h"
 #include "CodeValidator.h"
+#include "BarcodeDecoder.h"
 
 #include <opencv2/imgproc.hpp>
-#include <ZXing/ReadBarcode.h>
 
 CameraScanner::~CameraScanner() { stop(); }
 
@@ -78,59 +78,18 @@ OperationResult CameraScanner::scanNextFrame(cv::Mat& frame)
 
     r = decodeFrame(grabbed);
     if (r.success)
-        paused_ = true;   // pause after a successful scan (plan section 4.4)
+        paused_ = true;   // pause after a successful scan
     return r;
 }
 
 OperationResult CameraScanner::decodeFrame(const cv::Mat& frame)
 {
-    OperationResult r;
-
-    if (frame.empty()) {
-        r.message = "Empty image.";
-        return r;
-    }
-
-    // ZXing reads a grayscale buffer.
-    cv::Mat gray;
-    switch (frame.channels()) {
-    case 1:  gray = frame.isContinuous() ? frame : frame.clone(); break;
-    case 3:  cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);  break;
-    case 4:  cv::cvtColor(frame, gray, cv::COLOR_BGRA2GRAY); break;
-    default:
-        r.message = "Unsupported image format.";
-        return r;
-    }
-
-    try {
-        ZXing::ImageView view(gray.data, gray.cols, gray.rows,
-                              ZXing::ImageFormat::Lum,
-                              static_cast<int>(gray.step));
-
-        ZXing::ReaderOptions options;
-        options.setFormats(ZXing::BarcodeFormat::Code128);
-        options.setTryHarder(true);
-
-        ZXing::Barcode barcode = ZXing::ReadBarcode(view, options);
-
-        if (!barcode.isValid()) {
-            r.message = "No barcode detected.";
-            return r;
-        }
-
-        const std::string text = barcode.text();
-        if (!isValidSixDigitCode(text)) {
-            r.message = "Barcode found but its content is not a valid six-digit code.";
-            return r;
-        }
-
-        r.success = true;
-        r.value = text;
+    // Delegate directly to the centralized barcode decoder service
+    OperationResult r = decodeBarcodeMat(frame);
+    
+    // Adjust message wording slightly for camera context if needed
+    if (r.success) {
         r.message = "Scanned successfully.";
-        return r;
     }
-    catch (const std::exception& e) {
-        r.message = std::string("Decoder error: ") + e.what();
-        return r;
-    }
+    return r;
 }
