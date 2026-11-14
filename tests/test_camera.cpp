@@ -37,8 +37,9 @@ int main()
     std::cout << "camera released: " << (scanner.isRunning() ? "NO" : "yes") << "\n";
 
     if (!lastFrame.empty()) {
-        cv::imwrite("last_frame.png", lastFrame);
-        std::cout << "saved last_frame.png\n";
+       std::string debugOutputPath = "output/last_frame.png";
+               cv::imwrite(debugOutputPath, lastFrame);
+        std::cout << "saved " << debugOutputPath << "\n";
     }
     std::cout << (found ? "PASS" : "No valid code scanned in 15 s") << "\n";
     return found ? 0 : 2;
