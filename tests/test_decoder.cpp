@@ -44,7 +44,7 @@ int main()
 
     // 2. Missing file test
     OperationResult missing =
-        decodeBarcodeImage("does_not_exist.png");
+        decodeBarcodeImage("tests/test_images/does_not_exist.png");
 
     check("Missing file rejected", !missing.success);
 
@@ -54,12 +54,12 @@ int main()
     check("Empty image path rejected", !emptyPath.success);
 
     // 4. Corrupt image test
-    ofstream corrupt("corrupt_test.png");
+    ofstream corrupt("tests/test_images/corrupt_test.png");
     corrupt << "This is not a real image";
     corrupt.close();
 
     OperationResult badImage =
-        decodeBarcodeImage("corrupt_test.png");
+        decodeBarcodeImage("tests/test_images/corrupt_test.png");
 
     check("Corrupt image rejected", !badImage.success);
 
@@ -67,11 +67,11 @@ int main()
     cv::Mat blank(200, 400, CV_8UC3,
                   cv::Scalar(255, 255, 255));
 
-    bool saved = cv::imwrite("blank_test.png", blank);
+    bool saved = cv::imwrite("tests/test_images/blank_test.png", blank);
 
     if (saved) {
         OperationResult none =
-            decodeBarcodeImage("blank_test.png");
+            decodeBarcodeImage("tests/test_images/blank_test.png");
 
         check("No barcode in blank image",
               !none.success && none.value.empty());
@@ -93,10 +93,10 @@ int main()
         "output/generated_barcodes/123456.bmp");
 
     if (!source.empty() &&
-        cv::imwrite("jpg_test.jpg", source)) {
+        cv::imwrite("tests/test_images/jpg_test.jpg", source)) {
 
         OperationResult jpg =
-            decodeBarcodeImage("jpg_test.jpg");
+            decodeBarcodeImage("tests/test_images/jpg_test.jpg");
 
         check("JPG barcode decoding",
               jpg.success && jpg.value == "123456");
