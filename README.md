@@ -1,4 +1,4 @@
-﻿# ISE Project - Barcode Reader & Scanner
+# ISE Project - Barcode Reader & Scanner
 
 A C++ desktop application (Qt 6, OpenCV, ZXing-C++) that generates Code 39 barcodes from a six-digit code and reads them back from an image or a webcam.
 
@@ -47,10 +47,12 @@ It must say "Version 19.44" and "for x64". If it does not, update Visual Studio 
        cmake --preset default
        cmake --build --preset release
 
-6. Check that it works:
+6. Run all automatic tests (everything except test_camera):
 
-       build\Release\test_generator.exe
-       build\Release\test_decoder.exe
+       ctest --test-dir build -C Release --output-on-failure
+
+   Then check by hand:
+
        build\Release\test_camera.exe
        build\Release\BarcodeDesktopApp.exe
 
@@ -58,10 +60,13 @@ It must say "Version 19.44" and "for x64". If it does not, update Visual Studio 
    test_decoder should print "Passed: 7  Failed: 0" "Skipped: 2".
    test_camera should print camera startup state, live scanning status messages, the decoded 6-digit barcode value upon success, and a  final PASS or failure result.
 
+### Where the data lives (Increment 2)
+The app keeps Product.txt, Order.txt, OrderDetail.txt and Bill.txt in a `data` folder next to the .exe (`build\Release\data`). On the first run the files are copied from `sample_data`. To start again from the sample data, close the app and delete `build\Release\data`. Never commit `data/`.
+
 ### Adding code
-- Put service code in src/services/ and GUI code in src/gui/.
+- Put business logic in src/core/ (no Qt), service code in src/services/ and GUI code in src/gui/. The GUI may use core, core may use services, never the other way round.
 - Put test programs in tests/ and name them test_something.cpp. Each one becomes its own .exe.
-- No CMake edits are needed. After adding a new file, run `cmake --preset default` once so it is picked up.
+- Do not edit CMakeLists.txt (Member 5 owns it). After adding a new file, run `cmake --preset default` once so it is picked up.
 - Add new libraries only by asking the team leader (they go in vcpkg.json).
 
 ### Common problems
@@ -102,8 +107,9 @@ Do this the first time (to get the build setup) and whenever others have merged 
 ### 3. Save Your Work (Stage & Commit)
 After making edits or adding new files to your project, stage and commit them:
 
-    # 1. Stage all modified files
-    git add .
+    # 1. Stage only your own files, then check what is staged
+    git add path/to/your/file
+    git status
 
     # 2. Save changes locally with a descriptive message
     git commit -m "Add feature description here"
@@ -137,6 +143,6 @@ When you are ready to integrate your completed feature into the main codebase:
 | Check current status & branch | git status |
 | Switch to your branch | git checkout dev-memberX |
 | Get latest updates from integration | git merge origin/dev |
-| Stage all changes | git add . |
+| Stage your files | git add path/to/file |
 | Commit staged changes | git commit -m "your message" |
 | Push updates to GitHub | git push origin dev-memberX |

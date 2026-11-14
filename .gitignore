@@ -7,3 +7,5 @@ CMakeUserPresets.json
 *.user
 output/
 
+/data/
+*.tmp
