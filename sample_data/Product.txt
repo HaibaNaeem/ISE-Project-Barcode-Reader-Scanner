@@ -1,0 +1,9 @@
+101 123456 MILKP "Milk Powder 400g" count 450.00 20.00 10.00 12 "sample_data/barcodes/123456.bmp" #
+102 100230 RICE5K "Basmati Rice 5kg" count 1850.00 50.00 0.00 8 "sample_data/barcodes/100230.bmp" #
+103 200145 SUGAR "Sugar" weight 160.00 5.00 0.00 25.500 "sample_data/barcodes/200145.bmp" #
+104 300781 OILBTL "Cooking Oil 1L" count 520.00 25.00 15.00 20 "sample_data/barcodes/300781.bmp" #
+105 400912 TEA250 "Tea Leaves 250g" count 380.00 15.00 0.00 0 "sample_data/barcodes/400912.bmp" #
+106 500336 BISCUT "Chocolate Biscuits" count 60.00 3.00 2.00 100 "sample_data/barcodes/500336.bmp" #
+107 600274 FLOUR "Wheat Flour" weight 135.00 0.00 0.00 40.000 "sample_data/barcodes/600274.bmp" #
+108 700418 SOAP "Bath Soap" count 110.00 8.00 5.00 30 "sample_data/barcodes/700418.bmp" #
+109 800529 WATER "Mineral Water 1.5L" count 90.00 5.00 0.00 48 "sample_data/barcodes/800529.bmp" #
