@@ -1,52 +1,127 @@
+#include "BarcodeDecoder.h"
+#include <opencv2/imgcodecs.hpp>
 #include <iostream>
-#include <filesystem>
-#include "ImageDecoder.h"
-#include "BarcodeGenerator.h"
+#include <fstream>
 
-static int passed = 0;
-static int failed = 0;
+using namespace std;
 
-static void runDecoderTest(const std::string& id, const std::string& filePath, bool expectSuccess, const std::string& expectedValue = "")
+static int passed = 0, failed = 0, skipped = 0;
+
+static void check(const string& name, bool ok)
 {
-    OperationResult r = ImageDecoder::decodeFile(filePath);
+    cout << (ok ? "[PASS] " : "[FAIL] ") << name << "\n";
+    ok ? ++passed : ++failed;
+}
 
-    bool pass = (r.success == expectSuccess);
-    if (pass && expectSuccess && !expectedValue.empty()) {
-        pass = (r.value == expectedValue);
+static void checkRejected(const string& name, const string& path)
+{
+    ifstream file(path);
+
+    if (!file.good()) {
+        cout << "[SKIP] " << name << " - test image missing\n";
+        ++skipped;
+        return;
     }
 
-    std::cout << id << " | file=\"" << filePath << "\" | "
-              << (pass ? "PASS" : "FAIL") << " | "
-              << "result=\"" << r.value << "\" | "
-              << r.message << "\n";
-
-    if (pass) passed++; else failed++;
+    OperationResult r = decodeBarcodeImage(path);
+    check(name, !r.success);
 }
 
 int main()
 {
-    std::cout << "=== Image Decoder Service Tests (Member 3 Adapter) ===\n\n";
+    // 1. Valid barcode tests
+    for (string code : { "123456", "100230", "999999" }) {
 
-    // 1. Ensure test barcode exists (generate one if missing)
-    std::string testBmp = "output/generated_barcodes/123456.bmp";
-    if (!std::filesystem::exists(testBmp)) {
-        generateBarcode("123456", testBmp);
+        string path = "output/generated_barcodes/" + code + ".bmp";
+
+        OperationResult r = decodeBarcodeImage(path);
+
+        check(code, r.success && r.value == code);
+
+        if (!r.success)
+            cout << "   " << r.message << "\n";
     }
 
-    // Test valid barcodes
-    if (std::filesystem::exists("output/generated_barcodes/123456.bmp")) {
-        runDecoderTest("D-01", "output/generated_barcodes/123456.bmp", true, "123456");
+    // 2. Missing file test
+    OperationResult missing =
+        decodeBarcodeImage("tests/test_images/does_not_exist.png");
+
+    check("Missing file rejected", !missing.success);
+
+    // 3. Empty image path test
+    OperationResult emptyPath = decodeBarcodeImage("");
+
+    check("Empty image path rejected", !emptyPath.success);
+
+    // 4. Corrupt image test
+    ofstream corrupt("tests/test_images/corrupt_test.png");
+    corrupt << "This is not a real image";
+    corrupt.close();
+
+    OperationResult badImage =
+        decodeBarcodeImage("tests/test_images/corrupt_test.png");
+
+    check("Corrupt image rejected", !badImage.success);
+
+    // 5. Blank image test
+    cv::Mat blank(200, 400, CV_8UC3,
+                  cv::Scalar(255, 255, 255));
+
+    bool saved = cv::imwrite("tests/test_images/blank_test.png", blank);
+
+    if (saved) {
+        OperationResult none =
+            decodeBarcodeImage("tests/test_images/blank_test.png");
+
+        check("No barcode in blank image",
+              !none.success && none.value.empty());
     }
-    if (std::filesystem::exists("output/generated_barcodes/100230.bmp")) {
-        runDecoderTest("D-02", "output/generated_barcodes/100230.bmp", true, "100230");
+    else {
+        check("Blank image could not be saved", false);
     }
 
-    // Test non-existent file
-    runDecoderTest("D-03", "non_existent_file.png", false);
+    // 6. Empty Mat test
+    cv::Mat emptyImage;
 
-    // Test empty path
-    runDecoderTest("D-04", "", false);
+    OperationResult empty =
+        decodeBarcodeMat(emptyImage);
 
-    std::cout << "\nDecoder Tests Passed: " << passed << "  Failed: " << failed << "\n";
+    check("Empty image rejected", !empty.success);
+
+    // 7. JPG image test
+    cv::Mat source = cv::imread(
+        "output/generated_barcodes/123456.bmp");
+
+    if (!source.empty() &&
+        cv::imwrite("tests/test_images/jpg_test.jpg", source)) {
+
+        OperationResult jpg =
+            decodeBarcodeImage("tests/test_images/jpg_test.jpg");
+
+        check("JPG barcode decoding",
+              jpg.success && jpg.value == "123456");
+    }
+    else {
+        cout << "[SKIP] JPG test - source BMP missing\n";
+        ++skipped;
+    }
+
+    // 8. Invalid barcode content tests
+    checkRejected(
+        "Seven-digit barcode rejected",
+        "output/test_barcodes/1234567.bmp"
+    );
+
+    checkRejected(
+        "Zero-starting barcode rejected",
+        "output/test_barcodes/012345.bmp"
+    );
+
+    cout << "\n-----------------------------\n";
+    cout << "Passed: " << passed << "\n";
+    cout << "Failed: " << failed << "\n";
+    cout << "Skipped: " << skipped << "\n";
+    cout << "-----------------------------\n";
+
     return failed == 0 ? 0 : 1;
 }
