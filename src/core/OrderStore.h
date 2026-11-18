@@ -8,10 +8,12 @@
 class OrderStore {
 public:
     OrderStore() = default;
+    virtual ~OrderStore() = default;
     OrderStore(std::string orderPath, std::string detailPath);
 
-    OperationResult load();                      // in-progress orders become on-hold
-    OperationResult save() const;                // writes both files (not used by pay(); see serialize*)
+    virtual OperationResult load();                      // in-progress orders become on-hold
+    virtual OperationResult save() const;                // writes both files (not used by pay(); see serialize*)
+    virtual OperationResult save(const Order& order);    // save / update a single order and persist
 
     std::string serializeOrders() const;         // whole Order.txt as text (used by CheckoutService)
     std::string serializeDetails() const;        // whole OrderDetail.txt as text
@@ -23,6 +25,12 @@ public:
 
     std::vector<Order>& orders() { return orders_; }
     const std::vector<Order>& orders() const { return orders_; }
+
+    // Static helper methods for testing and pure logic
+    static std::string generateNextOrderId(const std::vector<Order>& existingOrders, int dayOfMonth);
+    static void recoverInProgressOrders(std::vector<Order>& orders);
+    static std::vector<std::string> findOrphanDetailLines(const std::vector<Order>& orders,
+                                                           const std::vector<std::string>& detailLines);
 
 private:
     std::string orderPath_, detailPath_;

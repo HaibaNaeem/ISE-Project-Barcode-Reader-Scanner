@@ -1,11 +1,9 @@
 #include <QApplication>
-#include <QLabel>
+#include "MainWindow.h"
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
-    QLabel label("Qt works!");
-    label.resize(300, 100);
-    label.show();
+    MainWindow window;
+    window.show();
     return app.exec();
 }

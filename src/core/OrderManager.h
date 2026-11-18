@@ -12,7 +12,8 @@
 class OrderManager {
 public:
     // store may be nullptr: then nothing is saved (use this in unit tests).
-    OrderManager(const ProductCatalog& catalog, OrderStore* store = nullptr);
+    OrderManager(const ProductCatalog& catalog, OrderStore* store = nullptr,
+                 std::function<std::string()> dateTimeProvider = nullptr);
 
     OperationResult startOrder(const std::string& customerName, const std::string& customerContact);
     OperationResult addByBarcode(const std::string& barcode, Quantity quantity);  // merges repeated scans, checks stock
@@ -32,8 +33,13 @@ public:
     void setClock(std::function<DateTime()> clock) { clock_ = std::move(clock); }
 
 private:
+    DateTime getNow() const;
+    void syncCurrentToStore();
+
     const ProductCatalog* catalog_;
     OrderStore* store_;
     std::optional<Order> current_;
     std::function<DateTime()> clock_;
+    std::function<std::string()> legacyClock_;
+    std::vector<Order> inMemoryOrders_;  // For standalone tests when store_ is nullptr
 };
