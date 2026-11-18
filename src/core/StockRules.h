@@ -4,6 +4,13 @@
 
 // Accepted if (already in the order + requested) <= available. Selling the last unit is allowed.
 // If the instructor says "less than", change ONLY the <= below.
+namespace StockRules {
 inline bool hasEnoughStock(Quantity inCart, Quantity requested, Quantity available) {
+    if (requested < 0 || inCart < 0) {
+        return false;
+    }
     return inCart + requested <= available;
 }
+}
+
+using StockRules::hasEnoughStock;

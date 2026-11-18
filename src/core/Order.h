@@ -2,6 +2,7 @@
 // OWNER: Member 3. Shared contract (frozen). Money/Quantity come from Units.h.
 #include <string>
 #include <vector>
+#include <optional>
 #include "Units.h"
 
 enum class OrderStatus { InProgress, OnHold, Paid, Archived };
@@ -50,6 +51,20 @@ inline bool parsePaymentMode(const std::string& t, PaymentMode& out) {
     if (t == "wallet") { out = PaymentMode::Wallet; return true; }
     if (t == "none")   { out = PaymentMode::None;   return true; }
     return false;
+}
+
+// Aliases for member 3 compatibility
+inline std::string orderStatusToString(OrderStatus s) { return orderStatusToText(s); }
+inline std::string paymentModeToString(PaymentMode m) { return paymentModeToText(m); }
+inline std::optional<OrderStatus> stringToOrderStatus(const std::string& t) {
+    OrderStatus s;
+    if (parseOrderStatus(t, s)) return s;
+    return std::nullopt;
+}
+inline std::optional<PaymentMode> stringToPaymentMode(const std::string& t) {
+    PaymentMode m;
+    if (parsePaymentMode(t, m)) return m;
+    return std::nullopt;
 }
 
 // Date/time used when an order is created. Tests can replace it (OrderManager::setClock).
