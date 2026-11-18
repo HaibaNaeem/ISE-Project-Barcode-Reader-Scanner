@@ -142,6 +142,68 @@ std::string safeWriteRecord(const std::vector<std::string>& fields) {
     return s;
 }
 
+constexpr char kItemSeparator  = ';';   // between two products
+constexpr char kFieldSeparator = ',';   // between the parts of one product
+constexpr size_t kFieldsPerBillLine = 9;
+constexpr size_t kPartsPerItem = 4;
+
+// Splits "a;b;c" into {"a","b","c"} (simple helper, no tricks)
+std::vector<std::string> splitText(const std::string& text, char separator) {
+    std::vector<std::string> parts;
+    std::string current;
+    for (char c : text) {
+        if (c == separator) {
+            parts.push_back(current);
+            current.clear();
+        } else {
+            current += c;
+        }
+    }
+    parts.push_back(current);
+    return parts;
+}
+
+// Reads the <items> field into BillLine objects.
+OperationResult parseItems(const std::string& text, int lineNum, std::vector<BillLine>& lines) {
+    lines.clear();
+    for (const std::string& itemText : splitText(text, kItemSeparator)) {
+        std::vector<std::string> parts = splitText(itemText, kFieldSeparator);
+        if (parts.size() != kPartsPerItem) {
+            return {false, "line " + std::to_string(lineNum) + ": bad item '" + itemText +
+                           "' (expected acronym,price,discount,quantity)"};
+        }
+
+        BillLine line;
+        line.acronym = parts[0];
+        if (!safeParseMoney(parts[1], line.unitPrice)) {
+            return {false, "line " + std::to_string(lineNum) + ": invalid unitPrice '" + parts[1] + "'"};
+        }
+        if (!safeParseMoney(parts[2], line.discountPerUnit)) {
+            return {false, "line " + std::to_string(lineNum) + ": invalid discountPerUnit '" + parts[2] + "'"};
+        }
+        if (!safeParseQuantity(parts[3], line.quantity)) {
+            return {false, "line " + std::to_string(lineNum) + ": invalid quantity '" + parts[3] + "'"};
+        }
+        lines.push_back(line);
+    }
+    return {true, "OK"};
+}
+
+// Builds the <items> field from BillLine objects.
+std::string buildItemsField(const std::vector<BillLine>& lines) {
+    std::string text;
+    for (size_t i = 0; i < lines.size(); ++i) {
+        if (i > 0) text += kItemSeparator;
+        text += lines[i].acronym;
+        text += kFieldSeparator;
+        text += formatMoneyString(lines[i].unitPrice);
+        text += kFieldSeparator;
+        text += formatMoneyString(lines[i].discountPerUnit);
+        text += kFieldSeparator;
+        text += formatQuantityString(lines[i].quantity);
+    }
+    return text;
+}
 } // anonymous namespace
 
 BillStore::BillStore(std::string path) : path_(std::move(path)) {}
@@ -192,114 +254,67 @@ OperationResult BillStore::load() {
             return splitRes;
         }
 
-        // Must have exactly 12 fields:
-        // billId, customerName, orderId, acronym, unitPrice, discountPerUnit,
-        // quantity, totalWithoutTax, totalTax, totalDiscount, totalPayable, status
-        if (fields.size() != 12) {
-            return {false, "line " + std::to_string(lineNum) + ": expected 12 fields but got " + std::to_string(fields.size())};
+        // One line = one bill, exactly 9 fields:
+        // 0 billId, 1 customerName, 2 orderId, 3 items,
+        // 4 totalWithoutTax, 5 totalTax, 6 totalDiscount, 7 totalPayable, 8 status
+        if (fields.size() != kFieldsPerBillLine) {
+            return {false, "line " + std::to_string(lineNum) + ": expected " +
+                           std::to_string(kFieldsPerBillLine) + " fields but got " +
+                           std::to_string(fields.size())};
         }
 
-        std::string billId = fields[0];
-        std::string customerName = fields[1];
-        std::string orderId = fields[2];
-        std::string acronym = fields[3];
+        Bill bill;
+        bill.id = fields[0];
+        bill.customerName = fields[1];
+        bill.orderId = fields[2];
 
-        Money unitPrice = 0, discountPerUnit = 0;
-        Quantity quantity = 0;
-        Money totalWithoutTax = 0, totalTax = 0, totalDiscount = 0, totalPayable = 0;
-
-        if (!safeParseMoney(fields[4], unitPrice)) {
-            return {false, "line " + std::to_string(lineNum) + ": invalid unitPrice '" + fields[4] + "'"};
-        }
-        if (!safeParseMoney(fields[5], discountPerUnit)) {
-            return {false, "line " + std::to_string(lineNum) + ": invalid discountPerUnit '" + fields[5] + "'"};
-        }
-        if (!safeParseQuantity(fields[6], quantity)) {
-            return {false, "line " + std::to_string(lineNum) + ": invalid quantity '" + fields[6] + "'"};
-        }
-        if (!safeParseMoney(fields[7], totalWithoutTax)) {
-            return {false, "line " + std::to_string(lineNum) + ": invalid totalWithoutTax '" + fields[7] + "'"};
-        }
-        if (!safeParseMoney(fields[8], totalTax)) {
-            return {false, "line " + std::to_string(lineNum) + ": invalid totalTax '" + fields[8] + "'"};
-        }
-        if (!safeParseMoney(fields[9], totalDiscount)) {
-            return {false, "line " + std::to_string(lineNum) + ": invalid totalDiscount '" + fields[9] + "'"};
-        }
-        if (!safeParseMoney(fields[10], totalPayable)) {
-            return {false, "line " + std::to_string(lineNum) + ": invalid totalPayable '" + fields[10] + "'"};
+        OperationResult itemsRes = parseItems(fields[3], lineNum, bill.lines);
+        if (!itemsRes.success) {
+            return itemsRes;
         }
 
-        OrderStatus status = OrderStatus::Paid;
-        if (!parseOrderStatus(fields[11], status)) {
-            return {false, "line " + std::to_string(lineNum) + ": invalid status '" + fields[11] + "'"};
+        if (!safeParseMoney(fields[4], bill.subtotal)) {
+            return {false, "line " + std::to_string(lineNum) + ": invalid totalWithoutTax '" + fields[4] + "'"};
+        }
+        if (!safeParseMoney(fields[5], bill.tax)) {
+            return {false, "line " + std::to_string(lineNum) + ": invalid totalTax '" + fields[5] + "'"};
+        }
+        if (!safeParseMoney(fields[6], bill.discount)) {
+            return {false, "line " + std::to_string(lineNum) + ": invalid totalDiscount '" + fields[6] + "'"};
+        }
+        if (!safeParseMoney(fields[7], bill.payable)) {
+            return {false, "line " + std::to_string(lineNum) + ": invalid totalPayable '" + fields[7] + "'"};
+        }
+        if (!parseOrderStatus(fields[8], bill.status)) {
+            return {false, "line " + std::to_string(lineNum) + ": invalid status '" + fields[8] + "'"};
         }
 
-        BillLine line;
-        line.acronym = acronym;
-        line.unitPrice = unitPrice;
-        line.discountPerUnit = discountPerUnit;
-        line.quantity = quantity;
-        line.lineSubtotal = totalWithoutTax;
-        line.lineTax = totalTax;
-        line.lineDiscount = totalDiscount;
-        line.linePayable = totalPayable;
-
-        // Group rows with identical billId into the same Bill object
-        if (!bills_.empty() && bills_.back().id == billId) {
-            bills_.back().lines.push_back(line);
-            bills_.back().subtotal += line.lineSubtotal;
-            bills_.back().tax += line.lineTax;
-            bills_.back().discount += line.lineDiscount;
-            bills_.back().payable += line.linePayable;
-        } else {
-            Bill newBill;
-            newBill.id = billId;
-            newBill.customerName = customerName;
-            newBill.orderId = orderId;
-            newBill.status = status;
-            newBill.lines.push_back(line);
-            newBill.subtotal = line.lineSubtotal;
-            newBill.tax = line.lineTax;
-            newBill.discount = line.lineDiscount;
-            newBill.payable = line.linePayable;
-            bills_.push_back(newBill);
-        }
+        bills_.push_back(bill);
     }
 
     return {true, "Loaded successfully"};
 }
-
 std::string BillStore::serialize() const {
     std::string output;
 
     for (const auto& bill : bills_) {
-        std::string statusText = orderStatusToText(bill.status);
-        std::string quotedCustomer = quoteField(bill.customerName);
-
-        for (const auto& line : bill.lines) {
-            std::vector<std::string> fields = {
-                bill.id,
-                quotedCustomer,
-                bill.orderId,
-                line.acronym,
-                formatMoneyString(line.unitPrice),
-                formatMoneyString(line.discountPerUnit),
-                formatQuantityString(line.quantity),
-                formatMoneyString(line.lineSubtotal),
-                formatMoneyString(line.lineTax),
-                formatMoneyString(line.lineDiscount),
-                formatMoneyString(line.linePayable),
-                statusText
-            };
-
-            output += safeWriteRecord(fields) + "\n";
-        }
+        // One line per bill, all products inside the items field
+        std::vector<std::string> fields = {
+            bill.id,
+            quoteField(bill.customerName),
+            bill.orderId,
+            buildItemsField(bill.lines),
+            formatMoneyString(bill.subtotal),
+            formatMoneyString(bill.tax),
+            formatMoneyString(bill.discount),
+            formatMoneyString(bill.payable),
+            orderStatusToText(bill.status)
+        };
+        output += safeWriteRecord(fields) + "\n";
     }
 
     return output;
 }
-
 OperationResult BillStore::save(const std::string& path) const {
     std::ofstream file(path, std::ios::binary);
     if (!file.is_open()) {
