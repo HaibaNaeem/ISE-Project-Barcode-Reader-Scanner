@@ -1,35 +1,25 @@
 #pragma once
 #include <QMainWindow>
+#include "core/DataPaths.h"
+#include "core/ProductCatalog.h"
+#include "core/OrderStore.h"
+#include "core/OrderManager.h"
+#include "core/CheckoutService.h"
 
-class QStackedWidget;
-class QPushButton;
-class GeneratePage;
-class ScanPage;
+class OrderPage;
 
-// MainWindow (Member 1 - Desktop GUI)
-// Hosts the main desktop interface, sidebar navigation, and switches
-// between Generate and Scan pages using a QStackedWidget.
+// Creates the core objects once and gives them to the OrderPage.
 class MainWindow : public QMainWindow {
     Q_OBJECT
-
 public:
     explicit MainWindow(QWidget* parent = nullptr);
-    ~MainWindow() override = default;
-
-protected:
-    void closeEvent(QCloseEvent* event) override;
-
-private slots:
-    void showGeneratePage();
-    void showScanPage();
 
 private:
-    void setupUi();
-
-    QStackedWidget* m_stackedWidget   = nullptr;
-    QPushButton*    m_navGenerateBtn  = nullptr;
-    QPushButton*    m_navScanBtn      = nullptr;
-
-    GeneratePage*   m_generatePage    = nullptr;
-    ScanPage*       m_scanPage        = nullptr;
+    // Declaration order = construction order. Do not reorder.
+    DataPaths       paths_;
+    ProductCatalog  catalog_;
+    OrderStore      store_;
+    OrderManager    orders_;
+    CheckoutService checkout_;
+    OrderPage*      page_ = nullptr;
 };
