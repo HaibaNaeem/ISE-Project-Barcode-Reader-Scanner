@@ -1,55 +1,19 @@
 #include "OrderPage.h"
+
 #include <QtWidgets>
 #include <cmath>
 
-// Optional pieces from other members. If their header is not merged yet,
-// a placeholder is used, so the project still compiles and runs.
-#if __has_include("gui/CameraPanel.h")
-#include "gui/CameraPanel.h"
-#define HAVE_CAMERA 1
-#endif
-#if __has_include("gui/ProductInfoDialog.h")
-#include "gui/ProductInfoDialog.h"
-#define HAVE_INFO 1
-#endif
-#if __has_include("gui/PaymentDialog.h") && __has_include("gui/BillDialog.h")
-#include "gui/PaymentDialog.h"
-#include "gui/BillDialog.h"
-#define HAVE_PAYMENT 1
-#endif
-#if __has_include("gui/HeldOrdersDialog.h")
-#include "gui/HeldOrdersDialog.h"
-#define HAVE_HELD 1
-#endif
-
 namespace {
 
-// Display only: paisa -> "125.50". No maths on money here.
 QString money(Money m) {
     const bool neg = m < 0;
     if (neg) m = -m;
     return QString("%1%2.%3").arg(neg ? "-" : "").arg(m / 100).arg(m % 100, 2, 10, QChar('0'));
 }
 
-// Display only: thousandths -> "3" for count, "1.250" for weight.
 QString qtyText(Quantity q, MeasureUnit u) {
     if (u == MeasureUnit::Count) return QString::number(q / 1000);
     return QString("%1.%2").arg(q / 1000).arg(q % 1000, 3, 10, QChar('0'));
-}
-
-struct Totals { Money subtotal = 0, tax = 0, discount = 0, payable = 0; };
-
-// ADAPT HERE if M4's Bill field names differ. Only adds up what
-// buildBill() already calculated.
-Totals totalsOf(const Bill& b) {
-    Totals t;
-    for (const auto& r : b.rows) {
-        t.subtotal += r.lineTotal;
-        t.tax      += r.taxTotal;
-        t.discount += r.discountTotal;
-        t.payable  += r.payable;
-    }
-    return t;
 }
 
 } // namespace
@@ -61,33 +25,20 @@ OrderPage::OrderPage(ProductCatalog& catalog, OrderManager& orders,
     refresh();
 }
 
-OrderPage::~OrderPage() {
-#ifdef HAVE_CAMERA
-    if (camera_) static_cast<CameraPanel*>(camera_)->stop();
-#endif
-}
+OrderPage::~OrderPage() = default;
 
 void OrderPage::buildUi() {
-    // ---- top: customer ----
     nameEdit_ = new QLineEdit; nameEdit_->setPlaceholderText("Customer name");
     contactEdit_ = new QLineEdit; contactEdit_->setPlaceholderText("Contact (optional)");
     auto* top = new QHBoxLayout;
     top->addWidget(new QLabel("Customer:")); top->addWidget(nameEdit_, 2);
     top->addWidget(contactEdit_, 1);
 
-    // ---- left: camera + manual entry ----
     auto* left = new QVBoxLayout;
-#ifdef HAVE_CAMERA
-    auto* cam = new CameraPanel;
-    camera_ = cam;
-    cameraHolder_ = cam;
-    connect(cam, &CameraPanel::barcodeScanned, this, &OrderPage::addBarcode);
-#else
-    auto* ph = new QLabel("Camera panel (coming from Member 5)");
+    auto* ph = new QLabel("Camera panel (Member 5)");
     ph->setAlignment(Qt::AlignCenter);
     ph->setFrameStyle(QFrame::Box);
     cameraHolder_ = ph;
-#endif
     cameraHolder_->setMinimumSize(280, 210);
     left->addWidget(cameraHolder_);
 
@@ -105,7 +56,6 @@ void OrderPage::buildUi() {
     connect(barcodeEdit_, &QLineEdit::returnPressed, this, &OrderPage::onManualAdd);
     connect(addBtn, &QPushButton::clicked, this, &OrderPage::onManualAdd);
 
-    // ---- middle: cart ----
     cart_ = new QTableWidget(0, 5);
     cart_->setHorizontalHeaderLabels({"Item", "Name", "Qty", "Unit price", "Line total"});
     cart_->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
@@ -114,7 +64,6 @@ void OrderPage::buildUi() {
     cart_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     connect(cart_, &QTableWidget::itemSelectionChanged, this, [this] { refresh(); });
 
-    // ---- right: totals + buttons ----
     subtotalLbl_ = new QLabel("0.00"); taxLbl_ = new QLabel("0.00");
     discountLbl_ = new QLabel("0.00"); payableLbl_ = new QLabel("0.00");
     payableLbl_->setStyleSheet("font-size:20px;font-weight:bold;");
@@ -140,17 +89,12 @@ void OrderPage::buildUi() {
     connect(payBtn_, &QPushButton::clicked, this, &OrderPage::onPay);
     connect(cancelBtn_, &QPushButton::clicked, this, &OrderPage::onCancel);
 
-    // ---- banner + assemble ----
     banner_ = new QLabel; banner_->setWordWrap(true); banner_->setMinimumHeight(28);
 
     auto* body = new QHBoxLayout;
     body->addLayout(left, 2); body->addWidget(cart_, 4); body->addLayout(right, 2);
     auto* root = new QVBoxLayout(this);
     root->addLayout(top); root->addLayout(body, 1); root->addWidget(banner_);
-
-#ifdef HAVE_CAMERA
-    static_cast<CameraPanel*>(camera_)->start();
-#endif
 }
 
 void OrderPage::showResult(const OperationResult& r) {
@@ -173,17 +117,14 @@ void OrderPage::refresh() {
 
     QSignalBlocker block(cart_);
     cart_->setRowCount(0);
-    Totals t;
 
     if (hasLines) {
-        const Bill bill = buildBill(*cur, catalog_, "000000000");  // preview, nothing saved
-        t = totalsOf(bill);
         int row = 0;
         for (const auto& line : cur->lines) {
             const auto p = catalog_.findById(line.productId);
             if (!p) continue;
             cart_->insertRow(row);
-            const Money lineTotal = (size_t(row) < bill.rows.size()) ? bill.rows[row].lineTotal : 0;
+            const Money lineTotal = multiplyPriceByQuantity(p->unitPrice, line.quantity);
             const QStringList cells = {
                 QString::fromStdString(p->acronym), QString::fromStdString(p->name),
                 qtyText(line.quantity, p->unit), money(p->unitPrice), money(lineTotal)};
@@ -198,15 +139,15 @@ void OrderPage::refresh() {
         }
     }
 
-    subtotalLbl_->setText(money(t.subtotal)); taxLbl_->setText(money(t.tax));
-    discountLbl_->setText(money(t.discount)); payableLbl_->setText(money(t.payable));
+    subtotalLbl_->setText("0.00"); taxLbl_->setText("0.00");
+    discountLbl_->setText("0.00"); payableLbl_->setText("0.00");
 
     const bool sel = !selectedProductId().isEmpty();
-    descBtn_->setEnabled(hasLines);                       // spec: disabled when cart empty
+    descBtn_->setEnabled(hasLines);
     plusBtn_->setEnabled(sel); minusBtn_->setEnabled(sel); removeBtn_->setEnabled(sel);
     holdBtn_->setEnabled(hasLines); payBtn_->setEnabled(hasLines);
     cancelBtn_->setEnabled(cur.has_value());
-    nameEdit_->setEnabled(!cur.has_value());              // name locked once order starts
+    nameEdit_->setEnabled(!cur.has_value());
     contactEdit_->setEnabled(!cur.has_value());
 }
 
@@ -237,11 +178,11 @@ void OrderPage::onDescription() {
     if (!id.isEmpty()) p = catalog_.findById(id.toStdString());
     else if (!lastBarcode_.isEmpty()) p = catalog_.findByBarcode(lastBarcode_.toStdString());
     if (!p) { showResult({false, "No product to describe yet."}); return; }
-#ifdef HAVE_INFO
-    ProductInfoDialog(*p, this).exec();
-#else
-    QMessageBox::information(this, "Product", QString::fromStdString(p->name));
-#endif
+
+    const QString text = QString::fromStdString(p->name)
+        + "\nBarcode: " + QString::fromStdString(p->barcode)
+        + "\nPrice: " + money(p->unitPrice);
+    QMessageBox::information(this, "Product", text);
 }
 
 void OrderPage::changeSelectedQuantity(int direction) {
@@ -278,32 +219,11 @@ void OrderPage::onHold() {
 }
 
 void OrderPage::onHeldOrders() {
-#ifdef HAVE_HELD
-    HeldOrdersDialog dlg(orders_, this);
-    if (dlg.exec() != QDialog::Accepted) return;
-    if (orders_.current() && !orders_.current()->lines.empty()) orders_.hold();
-    showResult(orders_.resume(dlg.selectedOrderId().toStdString()));
-    refresh();
-#else
-    showResult({false, "Held orders dialog not merged yet (Member 5)."});
-#endif
+    showResult({false, "Held orders screen not connected yet (Member 5)."});
 }
 
 void OrderPage::onPay() {
-    const auto& cur = orders_.current();
-    if (!cur || cur->lines.empty()) return;
-#ifdef HAVE_PAYMENT
-    const Totals t = totalsOf(buildBill(*cur, catalog_, "000000000"));
-    PaymentDialog dlg(t.payable, this);
-    if (dlg.exec() != QDialog::Accepted) return;
-    Bill out;
-    auto r = checkout_.pay(orders_, dlg.paymentInfo(), out);   // all or nothing
-    showResult(r);
-    if (r.success) BillDialog(out, this).exec();
-    refresh();
-#else
-    showResult({false, "Payment dialog not merged yet (Member 4)."});
-#endif
+    showResult({false, "Payment screen not connected yet (Member 4)."});
 }
 
 void OrderPage::onCancel() {

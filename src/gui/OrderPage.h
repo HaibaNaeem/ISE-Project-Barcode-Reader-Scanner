@@ -1,11 +1,11 @@
 #pragma once
 #include <QWidget>
 #include <QString>
-#include <string>
-#include "core/ProductCatalog.h"
-#include "core/OrderManager.h"
-#include "core/CheckoutService.h"
-#include "services/CommonTypes.h"
+
+#include "ProductCatalog.h"
+#include "OrderManager.h"
+#include "CheckoutService.h"
+#include "CommonTypes.h"
 
 class QLabel;
 class QLineEdit;
@@ -13,8 +13,6 @@ class QDoubleSpinBox;
 class QTableWidget;
 class QPushButton;
 
-// The order screen. Never reads files, never does money maths:
-// every number shown comes from buildBill().
 class OrderPage : public QWidget {
     Q_OBJECT
 public:
@@ -22,10 +20,10 @@ public:
               CheckoutService& checkout, QWidget* parent = nullptr);
     ~OrderPage() override;
 
-    void showResult(const OperationResult& r);   // status banner
+    void showResult(const OperationResult& r);
 
 public slots:
-    void addBarcode(const QString& code);        // camera or manual box
+    void addBarcode(const QString& code);
 
 private slots:
     void onManualAdd();
@@ -60,5 +58,4 @@ private:
     QPushButton *descBtn_ = nullptr, *plusBtn_ = nullptr, *minusBtn_ = nullptr,
                 *removeBtn_ = nullptr, *holdBtn_ = nullptr, *heldBtn_ = nullptr,
                 *payBtn_ = nullptr, *cancelBtn_ = nullptr;
-    QObject* camera_ = nullptr;   // CameraPanel (M5) when available
 };
